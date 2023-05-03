@@ -11,6 +11,7 @@ Currently, this repository contains solutions for exercises from the following w
 
 - [Itera-qa](https://itera-qa.azurewebsites.net/home/practice)
 - [UiTestingPlayground](http://www.uitestingplayground.com)
+- [The Internet](https://the-internet.herokuapp.com/) (In progress)
 
 In the near future, I plan to explore and add solutions for exercises from these websites:
 
