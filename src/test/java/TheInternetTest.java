@@ -2,14 +2,19 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.time.Duration;
 import java.util.Objects;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TheInternetTest {
 
@@ -166,5 +171,184 @@ public class TheInternetTest {
         driver.get("https://admin:admin@the-internet.herokuapp.com/digest_auth");
         var authParagraph = driver.findElement(By.xpath("//div//p"));
         assertEquals("Congratulations! You must have the proper credentials.", authParagraph.getText());
+    }
+
+    /*
+        1. refresh the-internet.herokuapp.com/disappearing_elements 6 times and
+        count how many times the Gallery button appeared
+     */
+    @Test
+    public void disappearing_elements() {
+        var galleryCount = 0;
+        driver.get("https://the-internet.herokuapp.com/disappearing_elements");
+        for(int i = 0; i<6; i++){
+            driver.navigate().refresh();
+            var galleryButton = driver.findElements(By.xpath("//a[@href=\"/gallery/\"]"));
+            galleryCount += galleryButton.size();
+        }
+    }
+
+    /*
+        1. assert that element with text "A" is the column on the left, and "B" is on the right.
+        2. drag and drop element "A" to the right.
+        3. assert that the elements have been swapped.
+
+        NOTE issue with drag and drop https://github.com/w3c/webdriver/issues/1488
+        Some way around it that worked for me:
+        https://stackoverflow.com/questions/62571462/selenium-drag-and-drop-not-working-with-action-methods-is-there-any-alterative
+     */
+    @Test
+    public void drag_and_drop() {
+        driver.get("https://the-internet.herokuapp.com/drag_and_drop");
+        var a = driver.findElement(By.xpath("//div[@id=\"column-a\"]//header"));
+        var b = driver.findElement(By.xpath("//div[@id=\"column-b\"]//header"));
+
+        assertEquals("A", a.getText());
+        assertEquals("B", b.getText());
+
+        JavascriptExecutor js = (JavascriptExecutor)driver;
+        js.executeScript("""
+                function createEvent(typeOfEvent) {
+                var event =document.createEvent("CustomEvent");
+                event.initCustomEvent(typeOfEvent,true, true, null);
+                event.dataTransfer = {
+                data: {},
+                setData: function (key, value) {
+                this.data[key] = value;
+                },
+                getData: function (key) {
+                return this.data[key];
+                }
+                };
+                return event;
+                }
+
+                function dispatchEvent(element, event,transferData) {
+                if (transferData !== undefined) {
+                event.dataTransfer = transferData;
+                }
+                if (element.dispatchEvent) {
+                element.dispatchEvent(event);
+                } else if (element.fireEvent) {
+                element.fireEvent("on" + event.type, event);
+                }
+                }
+
+                function simulateHTML5DragAndDrop(element, destination) {
+                var dragStartEvent =createEvent('dragstart');
+                dispatchEvent(element, dragStartEvent);
+                var dropEvent = createEvent('drop');
+                dispatchEvent(destination, dropEvent,dragStartEvent.dataTransfer);
+                var dragEndEvent = createEvent('dragend');
+                dispatchEvent(element, dragEndEvent,dropEvent.dataTransfer);
+                }
+
+                var source = arguments[0];
+                var destination = arguments[1];
+                simulateHTML5DragAndDrop(source,destination);""", a, b);
+
+        a = driver.findElement(By.xpath("//div[@id=\"column-a\"]//header"));
+        b = driver.findElement(By.xpath("//div[@id=\"column-b\"]//header"));
+
+        assertEquals("B", a.getText());
+        assertEquals("A", b.getText());
+    }
+
+    /*
+        1. select option 2 from the dropdown menu
+        2. select option 1 from the dropdown menu
+     */
+    @Test
+    public void dropdown() {
+        driver.get("https://the-internet.herokuapp.com/dropdown");
+        var dropdown = driver.findElement(By.xpath("//*[@id=\"dropdown\"]"));
+        Select select = new Select(dropdown);
+        select.selectByVisibleText("Option 2");
+        select.selectByVisibleText("Option 1");
+    }
+
+    /*
+        1. get text and image source from the second row
+     */
+    @Test
+    public void dynamic_content() {
+        driver.get("https://the-internet.herokuapp.com/dynamic_content");
+        var text = driver
+            .findElement(By.xpath("//div[@id=\"content\"]//div[@id=\"content\"]//div[@class=\"row\"][2]//div[2]"))
+            .getText();
+        var imageSrc = driver
+            .findElement(By.xpath("//div[@id=\"content\"]//div[@id=\"content\"]//div[@class=\"row\"][2]//img"))
+            .getAttribute("src");
+    }
+
+    /*
+        1. Select checkbox
+        2. Click on Remove button
+        3. Confirm that the message "It's gone!" is displayed
+        4. Confirm that the checkbox has been removed
+        5. Click on Add button
+        6. Confirm that the message "It's back!" is displayed
+        6. Select checkbox
+     */
+    @Test
+    public void dynamic_controls() {
+        driver.get("https://the-internet.herokuapp.com/dynamic_controls");
+        var swapButton = driver.findElement(By.xpath("//button[@onclick=\"swapCheckbox()\"]"));
+        var checkbox = driver.findElement(By.xpath("//input[@type=\"checkbox\"]"));
+        checkbox.click();
+        swapButton.click();
+        var goneMessage = new WebDriverWait(driver, Duration.ofSeconds(30)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//p[text()=\"It's gone!\"]"))
+        );
+        var checkboxList = driver.findElements(By.xpath("//input[@type=\"checkbox\"]"));
+        assertEquals(0, checkboxList.size());
+        swapButton.click();
+        var backMessage = new WebDriverWait(driver, Duration.ofSeconds(30)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//p[text()=\"It's back!\"]"))
+        );
+        checkbox = driver.findElement(By.xpath("//input[@type=\"checkbox\"]"));
+        checkbox.click();
+    }
+
+    /*
+        1. assert that Hello World text is not visible to the user
+        2. click start button
+        3. assert that Hello World text is visible to the user
+     */
+    @Test
+    public void dynamic_loading_1(){
+        driver.get("https://the-internet.herokuapp.com/dynamic_loading/1");
+        var helloWorldElementList = driver.findElements(By.xpath("//div[@id=\"finish\"]//h4"));
+        if(!helloWorldElementList.isEmpty()){
+            assertFalse(helloWorldElementList.get(0).isDisplayed());
+        }
+        var startButton = driver.findElement(By.xpath("//div[@id=\"start\"]//button"));
+        startButton.click();
+        var helloWorldElement = new WebDriverWait(driver, Duration.ofSeconds(20)).until(
+            ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@id=\"finish\"]//h4"))
+        );
+        assertTrue(helloWorldElement.isDisplayed());
+    }
+
+    /*
+        1. assert that Hello World text is not visible to the user
+        2. click start button
+        3. assert that Hello World text is visible to the user
+
+        I think ideally your test case should look just like dynamic_loading_1
+     */
+    @Test
+    public void dynamic_loading_2(){
+        driver.get("https://the-internet.herokuapp.com/dynamic_loading/2");
+        var helloWorldElementList = driver.findElements(By.xpath("//div[@id=\"finish\"]//h4"));
+        if(!helloWorldElementList.isEmpty()){
+            assertFalse(helloWorldElementList.get(0).isDisplayed());
+        }
+        var startButton = driver.findElement(By.xpath("//div[@id=\"start\"]//button"));
+        startButton.click();
+        var helloWorldElement = new WebDriverWait(driver, Duration.ofSeconds(20)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@id=\"finish\"]//h4"))
+        );
+        assertTrue(helloWorldElement.isDisplayed());
     }
 }
