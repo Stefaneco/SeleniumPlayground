@@ -1,16 +1,16 @@
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.Point;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.awt.*;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -288,7 +288,7 @@ public class TheInternetTest {
         4. Confirm that the checkbox has been removed
         5. Click on Add button
         6. Confirm that the message "It's back!" is displayed
-        6. Select checkbox
+        7. Select checkbox
      */
     @Test
     public void dynamic_controls() {
@@ -350,5 +350,69 @@ public class TheInternetTest {
                 ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@id=\"finish\"]//h4"))
         );
         assertTrue(helloWorldElement.isDisplayed());
+    }
+
+    /*
+        1. Assert that the popup appeared
+        2. Close the popup either by clicking outside it or on the footer
+        3. Assert that the popup has been closed
+        3. Refresh the page
+        4. Assert that the popup did not appear
+
+        Note: Popup appear with a slight delay!
+     */
+    @Test
+    public void entry_ad() {
+        driver.get("https://the-internet.herokuapp.com/entry_ad");
+
+        var popup = new WebDriverWait(driver,Duration.ofSeconds(10)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@class=\"modal\"]"))
+        );
+        assertTrue(popup.isDisplayed());
+        var closeButton = driver.findElement(By.xpath("//div[@class=\"modal\"]//div[@class=\"modal-footer\"]"));
+        closeButton.click();
+        driver.navigate().refresh();
+
+        assertThrows(TimeoutException.class, () ->
+            new WebDriverWait(driver, Duration.ofSeconds(3)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@class=\"modal\"]"))
+        ));
+    }
+
+    /*
+        1. Assert that the popup is not visible
+        2. Move mouse out of the view port
+        3. Assert that the popup appeared
+
+        Moving mouse out with actions didn't work for me so I used Robot.
+     */
+    @Test
+    public void exit_intent() throws AWTException {
+        driver.get("https://the-internet.herokuapp.com/exit_intent");
+        
+        WebElement headingElement = driver.findElement(By.xpath("//h3[contains(text(), 'Exit Intent')]"));
+        Actions actionInit = new Actions(driver);
+        actionInit.moveToElement(headingElement).build().perform();
+
+        assertThrows(TimeoutException.class, () ->
+            new WebDriverWait(driver, Duration.ofSeconds(3)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@class=\"modal\"]"))
+        ));
+
+        Dimension viewportSize = driver.manage().window().getSize();
+        Point viewportLocation = driver.manage().window().getPosition();
+
+        int xInsideViewport = viewportLocation.getX() + viewportSize.getWidth() / 2;
+        int yInsideViewport = viewportLocation.getY() + viewportSize.getHeight() / 2;
+
+        Robot robot = new Robot();
+        robot.mouseMove(xInsideViewport, yInsideViewport);
+
+        robot.mouseMove(6000,0);
+
+        var popup = new WebDriverWait(driver,Duration.ofSeconds(5)).until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@class=\"modal\"]"))
+        );
+        assertTrue(popup.isDisplayed());
     }
 }
